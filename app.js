@@ -36,8 +36,8 @@ let state = {
   activePelota: 'FOAM',
   activeCategoriaId: 'foam_mens',
   activeSubTab: 'grupos',
-  myGroupPicks: {},    // { partido_id: { pred_local, pred_visitante } }
-  myPlayoffPicks: [],  // [{ categoria_id, instancia, equipo_id }]
+  myGroupPicks: {},
+  myPlayoffPicks: [],
   leaderboard: [],
   onlyPaidFilter: true,
   adminPin: null,
@@ -76,6 +76,11 @@ async function loadBaseData() {
   }
   if (state.config.alias_pago) {
     document.getElementById('alias-text').textContent = state.config.alias_pago;
+  }
+  if (state.config.logo_url) {
+    const logoEl = document.getElementById('torneo-logo');
+    logoEl.src = state.config.logo_url;
+    logoEl.style.display = 'block';
   }
   if (state.config.cierre_prode) {
     state.cierreDate = new Date(state.config.cierre_prode);
@@ -132,24 +137,66 @@ function switchTab(tab) {
 }
 
 // ==========================================
-// AUTENTICACIÓN Y GESTIÓN DE BOLETAS
+// AUTENTICACIÓN (INGRESAR VS REGISTRARME)
 // ==========================================
+function switchAuthMode(mode) {
+  const isLogin = mode === 'login';
+  document.getElementById('auth-error').classList.add('hidden');
+
+  document.getElementById('form-login').classList.toggle('hidden', !isLogin);
+  document.getElementById('form-register').classList.toggle('hidden', isLogin);
+
+  const tabLogin = document.getElementById('authtab-login');
+  const tabReg = document.getElementById('authtab-register');
+
+  if (isLogin) {
+    tabLogin.className = 'py-3.5 text-sm font-bold text-amber-400 border-b-2 border-amber-400 bg-slate-900 transition';
+    tabReg.className = 'py-3.5 text-sm font-bold text-slate-400 border-b-2 border-transparent hover:text-white transition';
+  } else {
+    tabReg.className = 'py-3.5 text-sm font-bold text-emerald-400 border-b-2 border-emerald-400 bg-slate-900 transition';
+    tabLogin.className = 'py-3.5 text-sm font-bold text-slate-400 border-b-2 border-transparent hover:text-white transition';
+  }
+}
+
 async function handleLogin(e) {
   e.preventDefault();
   const email = document.getElementById('login-email').value;
-  const nombre = document.getElementById('login-nombre').value;
   const pin = document.getElementById('login-pin').value;
-  const errEl = document.getElementById('login-error');
+  const errEl = document.getElementById('auth-error');
   errEl.classList.add('hidden');
 
-  const { data, error } = await sb.rpc('acceder_participante', {
+  const { data, error } = await sb.rpc('login_participante', {
+    p_email: email,
+    p_pin: pin
+  });
+
+  if (error || !data || !data.length) {
+    errEl.textContent = error?.message || 'No se pudo iniciar sesión. Verificá tus datos.';
+    errEl.classList.remove('hidden');
+    return;
+  }
+
+  state.user = data[0];
+  localStorage.setItem('prode_user', JSON.stringify(state.user));
+  await initPlayerSession();
+}
+
+async function handleRegister(e) {
+  e.preventDefault();
+  const nombre = document.getElementById('reg-nombre').value;
+  const email = document.getElementById('reg-email').value;
+  const pin = document.getElementById('reg-pin').value;
+  const errEl = document.getElementById('auth-error');
+  errEl.classList.add('hidden');
+
+  const { data, error } = await sb.rpc('registrar_participante', {
     p_email: email,
     p_nombre: nombre,
     p_pin: pin
   });
 
   if (error || !data || !data.length) {
-    errEl.textContent = error?.message || 'Error al ingresar. Verificá tu PIN.';
+    errEl.textContent = error?.message || 'No se pudo completar el registro.';
     errEl.classList.remove('hidden');
     return;
   }
@@ -186,7 +233,6 @@ async function loadUserBoletas() {
 
   state.boletas = data || [];
 
-  // Si es usuario nuevo y aún no cerró el prode, creamos su primera boleta automáticamente
   if (state.boletas.length === 0 && !state.isClosed) {
     const { data: nueva } = await sb
       .from('boletas')
