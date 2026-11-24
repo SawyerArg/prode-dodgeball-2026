@@ -423,31 +423,47 @@ function renderGrupos() {
   const matches = state.partidos.filter(p => p.categoria_id === state.activeCategoriaId);
 
   if (matches.length === 0) {
+    const catPools = state.equiposCategorias.filter(
+      ec => ec.categoria_id === state.activeCategoriaId && ec.grupo
+    );
+    if (catPools.length === 0) {
+      container.innerHTML = `
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-8 text-center text-slate-400 text-sm">
+          Todavía no se cargaron los partidos de fase de grupos para esta categoría.
+        </div>`;
+      return;
+    }
+
+    const poolsMap = {};
+    catPools.forEach(ec => {
+      if (!poolsMap[ec.grupo]) poolsMap[ec.grupo] = [];
+      poolsMap[ec.grupo].push(state.equipos[ec.equipo_id] || { id: ec.equipo_id, nombre: ec.equipo_id });
+    });
+
     container.innerHTML = `
-      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-8 text-center text-slate-400 text-sm">
-        Todavía no se cargaron los partidos de fase de grupos para esta categoría.
+      <div class="bg-amber-500/10 border border-amber-500/30 rounded-xl px-4 py-2.5 text-xs text-amber-300">
+        Grupos oficiales confirmados. Apenas se publique el calendario vas a poder cargar los marcadores acá (ya podés ir completando <strong>Playoffs y Placements</strong>).
+      </div>
+      <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        ${Object.keys(poolsMap).sort().map(grupo => `
+          <div class="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
+            <div class="bg-slate-800/70 px-4 py-2 border-b border-slate-800 flex justify-between items-center">
+              <span class="font-bold text-xs text-amber-400 uppercase tracking-wider">${grupo}</span>
+              <span class="text-[11px] text-slate-400">${poolsMap[grupo].length} equipos</span>
+            </div>
+            <div class="divide-y divide-slate-800/60">
+              ${poolsMap[grupo].map(eq => `
+                <div class="px-4 py-2 flex items-center gap-2.5 text-sm text-slate-200">
+                  ${flagImg(eq.id)}
+                  <span>${eq.nombre}</span>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        `).join('')}
       </div>`;
     return;
   }
-
-  const byGroup = {};
-  matches.forEach(m => {
-    if (!byGroup[m.grupo]) byGroup[m.grupo] = [];
-    byGroup[m.grupo].push(m);
-  });
-
-  container.innerHTML = Object.entries(byGroup).map(([grupo, list]) => `
-    <div class="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
-      <div class="bg-slate-800/70 px-4 py-2.5 border-b border-slate-800 flex items-center justify-between">
-        <h3 class="font-bold text-sm text-amber-400 uppercase tracking-wider">${grupo}</h3>
-        <span class="text-xs text-slate-400">${list.length} partidos</span>
-      </div>
-      <div class="divide-y divide-slate-800/80">
-        ${list.map(m => renderMatchRow(m)).join('')}
-      </div>
-    </div>
-  `).join('');
-}
 
 function renderMatchRow(m) {
   const loc = state.equipos[m.equipo_local_id] || { id: m.equipo_local_id, nombre: m.equipo_local_id };
