@@ -465,6 +465,25 @@ function renderGrupos() {
     return;
   }
 
+  const byGroup = {};
+  matches.forEach(m => {
+    if (!byGroup[m.grupo]) byGroup[m.grupo] = [];
+    byGroup[m.grupo].push(m);
+  });
+
+  container.innerHTML = Object.entries(byGroup).map(([grupo, list]) => `
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
+      <div class="bg-slate-800/70 px-4 py-2.5 border-b border-slate-800 flex items-center justify-between">
+        <h3 class="font-bold text-sm text-amber-400 uppercase tracking-wider">${grupo}</h3>
+        <span class="text-xs text-slate-400">${list.length} partidos</span>
+      </div>
+      <div class="divide-y divide-slate-800/80">
+        ${list.map(m => renderMatchRow(m)).join('')}
+      </div>
+    </div>
+  `).join('');
+}
+
 function renderMatchRow(m) {
   const loc = state.equipos[m.equipo_local_id] || { id: m.equipo_local_id, nombre: m.equipo_local_id };
   const vis = state.equipos[m.equipo_visitante_id] || { id: m.equipo_visitante_id, nombre: m.equipo_visitante_id };
