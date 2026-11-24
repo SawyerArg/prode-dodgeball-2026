@@ -49,6 +49,15 @@ let state = {
 // INICIALIZACIÓN
 // ==========================================
 document.addEventListener('DOMContentLoaded', async () => {
+  if (SUPABASE_URL.includes('TU-PROYECTO') || SUPABASE_ANON_KEY.includes('TU-CLAVE')) {
+    const errEl = document.getElementById('auth-error');
+    if (errEl) {
+      errEl.textContent = 'Falta configurar SUPABASE_URL y SUPABASE_ANON_KEY en el archivo app.js de GitHub.';
+      errEl.classList.remove('hidden');
+    }
+    return;
+  }
+
   await loadBaseData();
   startCountdown();
 
@@ -160,50 +169,70 @@ function switchAuthMode(mode) {
 
 async function handleLogin(e) {
   e.preventDefault();
+  const btn = e.target.querySelector('button[type="submit"]');
+  const origText = btn.textContent;
   const email = document.getElementById('login-email').value;
   const pin = document.getElementById('login-pin').value;
   const errEl = document.getElementById('auth-error');
   errEl.classList.add('hidden');
 
-  const { data, error } = await sb.rpc('login_participante', {
-    p_email: email,
-    p_pin: pin
-  });
+  btn.disabled = true;
+  btn.textContent = 'Ingresando...';
 
-  if (error || !data || !data.length) {
-    errEl.textContent = error?.message || 'No se pudo iniciar sesión. Verificá tus datos.';
+  try {
+    const { data, error } = await sb.rpc('login_participante', {
+      p_email: email,
+      p_pin: pin
+    });
+
+    if (error) throw new Error(error.message);
+    if (!data || !data.length) throw new Error('No se recibió respuesta del servidor.');
+
+    state.user = data[0];
+    localStorage.setItem('prode_user', JSON.stringify(state.user));
+    await initPlayerSession();
+  } catch (err) {
+    errEl.textContent = err.message || 'No se pudo iniciar sesión. Verificá tus datos.';
     errEl.classList.remove('hidden');
-    return;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = origText;
   }
-
-  state.user = data[0];
-  localStorage.setItem('prode_user', JSON.stringify(state.user));
-  await initPlayerSession();
 }
 
 async function handleRegister(e) {
   e.preventDefault();
+  const btn = e.target.querySelector('button[type="submit"]');
+  const origText = btn.textContent;
   const nombre = document.getElementById('reg-nombre').value;
   const email = document.getElementById('reg-email').value;
   const pin = document.getElementById('reg-pin').value;
   const errEl = document.getElementById('auth-error');
   errEl.classList.add('hidden');
 
-  const { data, error } = await sb.rpc('registrar_participante', {
-    p_email: email,
-    p_nombre: nombre,
-    p_pin: pin
-  });
+  btn.disabled = true;
+  btn.textContent = 'Creando cuenta...';
 
-  if (error || !data || !data.length) {
-    errEl.textContent = error?.message || 'No se pudo completar el registro.';
+  try {
+    const { data, error } = await sb.rpc('registrar_participante', {
+      p_email: email,
+      p_nombre: nombre,
+      p_pin: pin
+    });
+
+    if (error) throw new Error(error.message);
+    if (!data || !data.length) throw new Error('No se recibió respuesta del servidor.');
+
+    state.user = data[0];
+    localStorage.setItem('prode_user', JSON.stringify(state.user));
+    await initPlayerSession();
+  } catch (err) {
+    errEl.textContent = err.message || 'No se pudo completar el registro.';
     errEl.classList.remove('hidden');
-    return;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = origText;
   }
-
-  state.user = data[0];
-  localStorage.setItem('prode_user', JSON.stringify(state.user));
-  await initPlayerSession();
 }
 
 function handleLogout() {
@@ -439,13 +468,11 @@ function renderMatchRow(m) {
       </div>
 
       <div class="flex items-center justify-between sm:justify-end gap-2 sm:gap-3">
-        <!-- LOCAL -->
         <div class="flex items-center gap-2 flex-1 sm:flex-initial justify-end">
           <span class="font-semibold text-sm text-white truncate max-w-[110px] sm:max-w-[140px]">${loc.nombre}</span>
           ${flagImg(loc.id)}
         </div>
 
-        <!-- INPUTS SETS -->
         <div class="flex items-center gap-1.5">
           <input type="number" min="0" max="50" ${disabled}
             id="pred-loc-${m.id}"
@@ -462,7 +489,6 @@ function renderMatchRow(m) {
             class="w-12 h-10 text-center font-mono font-bold text-base bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-amber-400 disabled:opacity-60" />
         </div>
 
-        <!-- VISITANTE -->
         <div class="flex items-center gap-2 flex-1 sm:flex-initial justify-start">
           ${flagImg(vis.id)}
           <span class="font-semibold text-sm text-white truncate max-w-[110px] sm:max-w-[140px]">${vis.nombre}</span>
